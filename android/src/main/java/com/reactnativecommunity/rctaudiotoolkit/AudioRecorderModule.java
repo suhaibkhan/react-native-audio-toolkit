@@ -40,6 +40,7 @@ public class AudioRecorderModule extends ReactContextBaseJavaModule implements
     private Integer meteringRecorderId = null;
     private MediaRecorder meteringRecorder = null;
     private int meteringInterval = 0;
+    private String outFilePath = null;
 
     public AudioRecorderModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -225,6 +226,12 @@ public class AudioRecorderModule extends ReactContextBaseJavaModule implements
         destroy(recorderId);
 
         Uri uri = uriFromPath(path);
+        outFilePath = uri.getPath();
+
+        File destFile = new File(outFilePath);
+        if (destFile.getParentFile() != null) {
+            destFile.getParentFile().mkdirs();
+        }
 
         Log.d(LOG_TAG, uri.getPath());
 
@@ -265,7 +272,7 @@ public class AudioRecorderModule extends ReactContextBaseJavaModule implements
         Log.d(LOG_TAG, "Recorder using options: (format: " + format + ") (encoder: " + encoder + ") "
                     + "(bitrate: " + bitrate + ") (channels: " + channels + ") (sampleRate: " + sampleRate + ")");
 
-        recorder.setOutputFile(uri.getPath());
+        recorder.setOutputFile(outFilePath);
 
         recorder.setOnErrorListener(this);
         recorder.setOnInfoListener(this);
@@ -341,6 +348,36 @@ public class AudioRecorderModule extends ReactContextBaseJavaModule implements
                 Log.d(LOG_TAG, "Autodestroying recorder...");
                 destroy(recorderId);
             }
+            callback.invoke();
+        } catch (Exception e) {
+            callback.invoke(errObj("stopfail", e.toString()));
+        }
+    }
+
+    @ReactMethod
+    public void abort(Integer recorderId, Callback callback) {
+        MediaRecorder recorder = this.recorderPool.get(recorderId);
+        if (recorder == null) {
+            callback.invoke(errObj("notfound", "recorderId " + recorderId + "not found."));
+            return;
+        }
+
+        try {
+            if (recorderId == meteringRecorderId) {
+                stopMeteringTimer();
+            }
+            recorder.stop();
+            if (this.recorderAutoDestroy.get(recorderId)) {
+                Log.d(LOG_TAG, "Autodestroying recorder...");
+                destroy(recorderId);
+            }
+            // delete file
+            File f = new File(outFilePath);
+            if (f.exists()) {
+                // delete
+                f.delete();
+            }
+
             callback.invoke();
         } catch (Exception e) {
             callback.invoke(errObj("stopfail", e.toString()));
