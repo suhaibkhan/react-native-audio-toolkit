@@ -1,25 +1,25 @@
-'use strict';
+"use strict";
 
 import {
   NativeModules,
   DeviceEventEmitter,
   NativeAppEventEmitter,
-  Platform
-} from 'react-native';
+  Platform,
+} from "react-native";
 
-import async from 'async';
-import EventEmitter from 'eventemitter3';
-import MediaStates from './MediaStates';
+import async from "async";
+import EventEmitter from "eventemitter3";
+import MediaStates from "./MediaStates";
 
 // Only import specific items from lodash to keep build size down
-import noop from 'lodash/noop';
+import noop from "lodash/noop";
 
 var RCTAudioRecorder = NativeModules.AudioRecorder;
 
 var recorderId = 0;
 
 var defaultRecorderOptions = {
-  autoDestroy: true
+  autoDestroy: true,
 };
 
 /**
@@ -36,11 +36,15 @@ class Recorder extends EventEmitter {
     this._recorderId = recorderId++;
     this._reset();
 
-    let appEventEmitter = Platform.OS === 'ios' ? NativeAppEventEmitter : DeviceEventEmitter;
+    let appEventEmitter =
+      Platform.OS === "ios" ? NativeAppEventEmitter : DeviceEventEmitter;
 
-    appEventEmitter.addListener('RCTAudioRecorderEvent:' + this._recorderId, (payload: Event) => {
-      this._handleEvent(payload.event, payload.data);
-    });
+    appEventEmitter.addListener(
+      "RCTAudioRecorderEvent:" + this._recorderId,
+      (payload: Event) => {
+        this._handleEvent(payload.event, payload.data);
+      }
+    );
   }
 
   _reset() {
@@ -57,13 +61,13 @@ class Recorder extends EventEmitter {
   _handleEvent(event, data) {
     //console.log('event: ' + event + ', data: ' + JSON.stringify(data));
     switch (event) {
-      case 'ended':
+      case "ended":
         this._state = Math.min(this._state, MediaStates.PREPARED);
         break;
-      case 'info':
+      case "info":
         // TODO
         break;
-      case 'error':
+      case "error":
         this._reset();
         //this.emit('error', data);
         break;
@@ -76,11 +80,16 @@ class Recorder extends EventEmitter {
     this._updateState(null, MediaStates.PREPARING);
 
     // Prepare recorder
-    RCTAudioRecorder.prepare(this._recorderId, this._path, this._options, (err, fsPath) => {
-      this._fsPath = fsPath;
-      this._updateState(err, MediaStates.PREPARED);
-      callback(err, fsPath);
-    });
+    RCTAudioRecorder.prepare(
+      this._recorderId,
+      this._path,
+      this._options,
+      (err, fsPath) => {
+        this._fsPath = fsPath;
+        this._updateState(err, MediaStates.PREPARED);
+        callback(err, fsPath);
+      }
+    );
 
     return this;
   }
@@ -134,6 +143,19 @@ class Recorder extends EventEmitter {
     return this;
   }
 
+  resume(callback = noop) {
+    if (this._state === MediaStates.PAUSED) {
+      RCTAudioRecorder.resume(this._recorderId, (err) => {
+        this._updateState(err, MediaStates.RECORDING);
+        callback(err);
+      });
+    } else {
+      setTimeout(callback, 0);
+    }
+
+    return this;
+  }
+
   toggleRecord(callback = noop) {
     if (this._state === MediaStates.RECORDING) {
       this.stop((err) => {
@@ -153,12 +175,24 @@ class Recorder extends EventEmitter {
     RCTAudioRecorder.destroy(this._recorderId, callback);
   }
 
-  get state()       { return this._state;                          }
-  get canRecord()   { return this._state >= MediaStates.PREPARED;  }
-  get canPrepare()  { return this._state == MediaStates.IDLE;      }
-  get isRecording() { return this._state == MediaStates.RECORDING; }
-  get isPrepared()  { return this._state == MediaStates.PREPARED;  }
-  get fsPath()      { return this._fsPath; }
+  get state() {
+    return this._state;
+  }
+  get canRecord() {
+    return this._state >= MediaStates.PREPARED;
+  }
+  get canPrepare() {
+    return this._state == MediaStates.IDLE;
+  }
+  get isRecording() {
+    return this._state == MediaStates.RECORDING;
+  }
+  get isPrepared() {
+    return this._state == MediaStates.PREPARED;
+  }
+  get fsPath() {
+    return this._fsPath;
+  }
 }
 
 export default Recorder;
