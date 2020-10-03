@@ -168,6 +168,14 @@ public class AudioRecorderModule extends ReactContextBaseJavaModule implements
         }, 0, monitorInterval);
     }
 
+    private void pauseMeteringTimer() {
+        if (meteringUpdateTimer != null) {
+            meteringUpdateTimer.cancel();
+            meteringUpdateTimer.purge();
+            meteringUpdateTimer = null;
+        }
+    }
+
     private void stopMeteringTimer() {
         if (meteringUpdateTimer != null) {
             meteringUpdateTimer.cancel();
@@ -358,16 +366,44 @@ public class AudioRecorderModule extends ReactContextBaseJavaModule implements
 
         try {
             if (recorderId == meteringRecorderId) {
-                stopMeteringTimer();
+                pauseMeteringTimer();
             }
             recorder.pause();
-            if (this.recorderAutoDestroy.get(recorderId)) {
-                Log.d(LOG_TAG, "Autodestroying recorder...");
-                destroy(recorderId);
-            }
+//            if (this.recorderAutoDestroy.get(recorderId)) {
+//                Log.d(LOG_TAG, "Autodestroying recorder...");
+//                destroy(recorderId);
+//            }
             callback.invoke();
         } catch (Exception e) {
-            callback.invoke(errObj("stopfail", e.toString()));
+            callback.invoke(errObj("pausefail", e.toString()));
+        }
+    }
+
+    @ReactMethod
+    public void resume(Integer recorderId, Callback callback) {
+        if (android.os.Build.VERSION.SDK_INT < 24) {
+            callback.invoke(errObj("notsupported", "Android version doesn't support resume"));
+            return;
+        }
+        resume24(recorderId,callback);
+    }
+
+    @TargetApi(24)
+    private void resume24(Integer recorderId, Callback callback) {
+        MediaRecorder recorder = this.recorderPool.get(recorderId);
+        if (recorder == null) {
+            callback.invoke(errObj("notfound", "recorderId " + recorderId + "not found."));
+            return;
+        }
+
+        try {
+            if (recorderId == meteringRecorderId) {
+                startMeteringTimer(meteringInterval);
+            }
+            recorder.resume();
+            callback.invoke();
+        } catch (Exception e) {
+            callback.invoke(errObj("resumefail", e.toString()));
         }
     }
 
